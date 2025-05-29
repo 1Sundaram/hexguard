@@ -1,3 +1,8 @@
+// static/js/app.js
+
+// Change this to your deployed API URL:
+const API_BASE = "https://hexguard-api.onrender.com";
+
 const startBtn    = document.getElementById('start-btn');
 const downloadBtn = document.getElementById('download-btn');
 const clearBtn    = document.getElementById('clear-btn');
@@ -31,7 +36,8 @@ startBtn.addEventListener('click', async () => {
   log(`Starting scan: ${url}`);
   setProgress(10);
 
-  const resp = await fetch('/api/scan', {
+  // Call your deployed API
+  const resp = await fetch(`${API_BASE}/api/scan`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({url, options: opts})
@@ -51,13 +57,13 @@ startBtn.addEventListener('click', async () => {
 
   downloadBtn.disabled = false;
   downloadBtn.onclick = async () => {
-    const r = await fetch('/api/report', {
+    const r = await fetch(`${API_BASE}/api/report`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({url, vulns})
     });
     const { report: fname } = await r.json();
-    window.open(`/download/${fname}`, '_blank');
+    window.open(`${API_BASE}/download/${fname}`, '_blank');
   };
 
   setProgress(100);
