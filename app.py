@@ -1,161 +1,140 @@
-import os
-import datetime
-import re
+from flask import Flask, render_template, request, jsonify, send_file
 import requests
 from urllib.parse import urljoin, urlparse
-
 from bs4 import BeautifulSoup
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_cors import CORS
+import os
+from fpdf import FPDF
 
-app = Flask(
-    __name__,
-    static_folder="static",
-    template_folder="templates"
-)
-CORS(app)
+app = Flask(__name__)
 
-# make `now()` available in templates
-@app.context_processor
-def inject_now():
-    return {"now": datetime.datetime.now}
+# Simulated burp-style logs for educational/demo purposes
+burp_logs = []
 
-# configuration
-HACKERTARGET_API_BASE = "http://api.hackertarget.com"
-MAX_PAGES = 10
-HEADERS = {"User-Agent": "HexGuardScanner/1.0"}
+def get_all_forms(url):
+    soup = BeautifulSoup(requests.get(url).content, "html.parser")
+    return soup.find_all("form")
 
-def requests_get(url, **kwargs):
-    return requests.get(url, timeout=5, headers=HEADERS, **kwargs)
-
-def get_domain(url):
-    p = urlparse(url)
-    return p.netloc or p.path
-
-def discover_urls(base_url):
-    """Fetch base_url, return up to MAX_PAGES unique links."""
+def get_form_details(form):
+    details = {}
     try:
-        r = requests_get(base_url)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = {
-            urljoin(base_url, a["href"])
-            for a in soup.find_all("a", href=True)
-        }
-        return list(links)[:MAX_PAGES]
+        action = form.attrs.get("action").lower()
     except:
-        return []
+        action = ""
+    method = form.attrs.get("method", "get").lower()
+    inputs = []
+    for input_tag in form.find_all("input"):
+        input_type = input_tag.attrs.get("type", "text")
+        input_name = input_tag.attrs.get("name")
+        inputs.append({"type": input_type, "name": input_name})
+    details['action'] = action
+    details['method'] = method
+    details['inputs'] = inputs
+    return details
 
-def is_sql_vulnerable(page_url):
-    payloads = ["' OR '1'='1", "'--", "' OR 'x'='x"]
-    found = []
-    for p in payloads:
-        try:
-            r = requests_get(f"{page_url}?id={p}")
-            if re.search(r"sql|error|warning", r.text, re.I):
-                found.append(p)
-        except:
-            pass
-    return found
+def is_vulnerable(response):
+    errors = {"quoted string not properly terminated", "unclosed quotation mark", "you have an error in your sql syntax"}
+    for error in errors:
+        if error in response.content.decode().lower():
+            return True
+    return False
 
-def is_xss_vulnerable(page_url):
-    payload = "<script>alert(1)</script>"
-    try:
-        r = requests_get(f"{page_url}?input={payload}")
-        return payload in r.text
-    except:
-        return False
-
-def free_port_scan(url):
-    domain = get_domain(url)
-    r = requests_get(f"{HACKERTARGET_API_BASE}/nmap/?q={domain}")
-    return r.text if r.ok else f"Error: {r.text}"
-
-def free_tech_detect(url):
-    domain = get_domain(url)
-    r = requests_get(f"{HACKERTARGET_API_BASE}/httpheaders/?q={domain}")
-    return r.text if r.ok else f"Error: {r.text}"
-
-@app.route("/")
+@app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template('index.html')
 
-@app.route("/api/scan", methods=["POST"])
-def api_scan():
-    data = request.get_json(force=True)
-    url  = data.get("url", "").strip()
-    opts = data.get("options", {})
-    if not url:
-        return jsonify(error="URL is required"), 400
+@app.route('/scan', methods=['POST'])
+def scan():
+    target_url = request.json.get('url')
+    attack_types = request.json.get('attackTypes', [])
 
-    log_lines = []
-    discovered = discover_urls(url)
-    log_lines.append(f"Discovered {len(discovered)} pages (max {MAX_PAGES})")
+    results = {
+        "sql_injection": [],
+        "burp_logs": [],
+        "messages": []
+    }
 
-    vulns = {}
-    for page in discovered:
-        page_v = {}
-        if opts.get("sql"):
-            sql = is_sql_vulnerable(page)
-            if sql:
-                page_v["sql"] = sql
-        if opts.get("xss") and is_xss_vulnerable(page):
-            page_v["xss"] = True
-        if page_v:
-            vulns[page] = page_v
-    if opts.get("ports"):
-        log_lines.append("=== Port Scan ===")
-        log_lines.append(free_port_scan(url))
-    if opts.get("tech"):
-        log_lines.append("=== Tech Detect ===")
-        log_lines.append(free_tech_detect(url))
-    if opts.get("burp"):
-        log_lines.append("=== Burp Suite Logs ===")
-        if os.path.exists("burp_suite_log.txt"):
-            with open("burp_suite_log.txt") as f:
-                log_lines.extend(line.strip() for line in f)
+    if not target_url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    try:
+        # Add initial request to burp-style log
+        burp_logs.clear()
+        burp_logs.append(f"GET {target_url} HTTP/1.1")
+
+        if "sql" in attack_types:
+            forms = get_all_forms(target_url)
+            if not forms:
+                results["messages"].append("No forms found to test for SQL Injection.")
+            for form in forms:
+                details = get_form_details(form)
+                for input_tag in details["inputs"]:
+                    data = {}
+                    if input_tag["name"]:
+                        data[input_tag["name"]] = "' OR '1'='1"
+                        url = urljoin(target_url, details["action"])
+                        if details["method"] == "post":
+                            r = requests.post(url, data=data)
+                            burp_logs.append(f"POST {url} HTTP/1.1")
+                        else:
+                            r = requests.get(url, params=data)
+                            burp_logs.append(f"GET {url} HTTP/1.1")
+                        if is_vulnerable(r):
+                            results["sql_injection"].append({"form": details, "url": url})
         else:
-            log_lines.append("(no burp_suite_log.txt)")
+            results["messages"].append("SQL Injection test not selected.")
 
-    if vulns:
-        log_lines.append("=== Vulnerabilities Found ===")
-        for p, vs in vulns.items():
-            types = ", ".join(vs.keys())
-            log_lines.append(f"– {p}: {types}")
+        # Simulate adding burp logs from log file (optional)
+        burp_file_path = "burp_suite_log.txt"
+        if os.path.exists(burp_file_path):
+            with open(burp_file_path) as f:
+                for line in f:
+                    if line.strip():
+                        burp_logs.append(line.strip())
+        else:
+            results["messages"].append("Burp Suite log file not found.")
+
+        results["burp_logs"] = burp_logs or ["No traffic captured during scan."]
+
+        if not results["sql_injection"]:
+            results["messages"].append("No SQL Injection vulnerabilities found.")
+
+        return jsonify(results)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/download-report', methods=['POST'])
+def download_report():
+    data = request.json
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    pdf.cell(200, 10, txt="HexGuard Scan Report", ln=True, align='C')
+
+    pdf.ln(10)
+    pdf.cell(200, 10, txt="SQL Injection Results:", ln=True)
+
+    if not data.get("sql_injection"):
+        pdf.cell(200, 10, txt="No SQL vulnerabilities found.", ln=True)
     else:
-        log_lines.append("No SQLi or XSS vulnerabilities found.")
+        for item in data["sql_injection"]:
+            pdf.multi_cell(0, 10, txt=f"Vulnerable Form at: {item['url']}")
 
-    report_name = f"report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-    return jsonify(output="\n".join(log_lines), report=report_name, vulns=vulns)
+    pdf.ln(5)
+    pdf.cell(200, 10, txt="Burp Logs:", ln=True)
 
-@app.route("/api/report", methods=["POST"])
-def api_report():
-    data = request.get_json(force=True)
-    url       = data.get("url", "")
-    vulns     = data.get("vulns", {})
-    discovered = discover_urls(url)
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    html = render_template(
-        "report.html",
-        url=url,
-        timestamp=timestamp,
-        discovered=discovered,
-        vulns=vulns
-    )
-    name = f"report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-    with open(name, "w", encoding="utf-8") as f:
-        f.write(html)
-    return jsonify(report=name)
+    if not data.get("burp_logs"):
+        pdf.cell(200, 10, txt="No burp logs found.", ln=True)
+    else:
+        for log in data["burp_logs"]:
+            pdf.multi_cell(0, 10, txt=log)
 
-@app.route("/download/<path:filename>")
-def download(filename):
-    return send_file(
-        filename,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="text/html"
-    )
+    pdf_output = "report.pdf"
+    pdf.output(pdf_output)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5500))
-    app.run(debug=True, host="0.0.0.0", port=port)
+    return send_file(pdf_output, as_attachment=True)
+
+if __name__ == '__main__':
+    app.run(debug=True)

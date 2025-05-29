@@ -1,46 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Report for {{ url }}</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { color: #333366; }
-    h2 { color: #555; }
-    ul { list-style-type: disc; margin-left: 20px; }
-    pre { background: #f4f4f4; padding: 10px; border-radius: 4px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Scan Report</title>
 </head>
 <body>
-  <h1>Vulnerability Report for {{ url }}</h1>
-  <p><strong>Generated:</strong> {{ timestamp }}</p>
+    <h2>Scan Report</h2>
+    {% if results.sql_injection %}
+        <h3>SQL Injection Vulnerabilities Found:</h3>
+        <ul>
+            {% for item in results.sql_injection %}
+                <li>Vulnerable form at: {{ item.url }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No SQL Injection vulnerabilities found.</p>
+    {% endif %}
 
-  <h2>Discovered URLs ({{ discovered|length }})</h2>
-  <ul>
-    {% for u in discovered %}
-      <li>{{ u }}</li>
-    {% endfor %}
-  </ul>
-
-  <h2>Vulnerabilities</h2>
-  {% if vulns %}
-    {% for page, vs in vulns.items() %}
-      <h3>{{ page }}</h3>
-      <ul>
-        {% for t, val in vs.items() %}
-          <li>
-            <strong>{{ t|upper }}</strong> –
-            {% if t == 'sql' %}
-              payloads: {{ val|join(', ') }}
-            {% else %}
-              detected
-            {% endif %}
-          </li>
+    <h3>Burp Logs:</h3>
+    {% if results.burp_logs %}
+        <pre>
+        {% for log in results.burp_logs %}
+            {{ log }}
         {% endfor %}
-      </ul>
-    {% endfor %}
-  {% else %}
-    <p>No SQLi or XSS vulnerabilities found.</p>
-  {% endif %}
+        </pre>
+    {% else %}
+        <p>No burp logs found.</p>
+    {% endif %}
+
+    <h3>Messages:</h3>
+    <ul>
+        {% for message in results.messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
