@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+
+# Virtualenv
+venv/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Reports
+report_*.html
