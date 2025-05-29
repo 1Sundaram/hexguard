@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Report for {{ url }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333366; }
+    h2 { color: #555; }
+    ul { list-style-type: disc; margin-left: 20px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Vulnerability Report for {{ url }}</h1>
+  <p><strong>Generated:</strong> {{ timestamp }}</p>
+
+  <h2>Discovered URLs ({{ discovered|length }})</h2>
+  <ul>
+    {% for u in discovered %}
+      <li>{{ u }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Vulnerabilities</h2>
+  {% if vulns %}
+    {% for page, vs in vulns.items() %}
+      <h3>{{ page }}</h3>
+      <ul>
+        {% for t, val in vs.items() %}
+          <li>
+            <strong>{{ t|upper }}</strong> –
+            {% if t == 'sql' %}
+              payloads: {{ val|join(', ') }}
+            {% else %}
+              detected
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  {% else %}
+    <p>No SQLi or XSS vulnerabilities found.</p>
+  {% endif %}
+</body>
+</html>
