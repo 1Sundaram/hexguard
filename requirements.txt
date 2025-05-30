@@ -1,5 +1,11 @@
-Flask==2.3.2
 Flask-CORS==3.0.10
 requests==2.31.0
 beautifulsoup4==4.12.2
 reportlab==3.8.0
+=======
+
+Flask==2.3.2
+Flask-CORS==3.0.10
+requests==2.31.0
+beautifulsoup4==4.12.2
+fpdf==1.7.2

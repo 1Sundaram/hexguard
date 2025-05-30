@@ -3,6 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <title>Scan Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h2, h3 {
+            color: #2c3e50;
+        }
+        ul {
+            list-style-type: disc;
+            margin-left: 20px;
+        }
+        pre {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
 </head>
 <body>
     <h2>Scan Report</h2>
@@ -25,7 +46,7 @@
         {% endfor %}
         </pre>
     {% else %}
-        <p>No burp logs found.</p>
+        <p>No Burp logs found.</p>
     {% endif %}
 
     <h3>Messages:</h3>

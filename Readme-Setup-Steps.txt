@@ -11,4 +11,4 @@ venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 
 #4. Run the App Locally
-waitress-serve --port=5500 app:app
+waitress-serve --host=127.0.0.1 --port=5500 app:app 

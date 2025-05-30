@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="icon" type="image" href="hg-fv.png">
+  <link rel="stylesheet" href="hexguard.css">
+  <title>Hex-Guard</title>
+  <style>
+    :root {
+      --bg-color: #f4f4f4;
+      --text-color: #111;
+      --card-bg: #fff;
+      --primary: #333366;
+      --primary-hover: #555599;
+      --console-bg: #111;
+      --console-text: #0f0;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #1e1e2f;
+      --text-color: #eee;
+      --card-bg: #2e2e3e;
+      --primary: #6c63ff;
+      --primary-hover: #918cff;
+      --console-bg: #000;
+      --console-text: #0f0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 99%;
+    }
+
+    .container {
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      width: 100%;
+    }
+
+    h1 {
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .options {
+      margin: 15px 0;
+    }
+
+    .options label {
+      display: block;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    button:hover {
+      background-color: var(--primary-hover);
+    }
+
+    #console {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: var(--console-bg);
+      color: var(--console-text);
+      font-family: monospace;
+      height: 200px;
+      overflow-y: auto;
+      border-radius: 10px;
+      white-space: pre-wrap;
+    }
+
+    .progress {
+      height: 8px;
+      background: #ccc;
+      margin-top: 15px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.3s ease-in-out;
+    }
+
+    .toggle-theme {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+    .toggle-theme button {
+      font-size: 14px;
+      background: none;
+      color: var(--primary);
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+   <nav>
+        <div class="navbar">
+            <img src="hg-fv.png" alt="Hex-Guard Logo" class="logo">
+            <h1>Hex-Guard</h1>
+        </div>
+    </nav>
+
+  <div class="container">
+    <div class="toggle-theme">
+      <button onclick="toggleTheme()">Toggle Dark Mode</button>
+    </div>
+    <h1>Hex-Guard</h1>
+
+    <label for="url">Enter Website URL:</label>
+    <input type="text" id="url" placeholder="https://example.com">
+
+    <div class="options">
+      <label><input type="checkbox" id="sql"> SQL Injection</label>
+      <label><input type="checkbox" id="xss"> Cross-site Scripting (XSS)</label>
+      <label><input type="checkbox" id="ports"> Open Ports</label>
+      <label><input type="checkbox" id="tech"> Technology Detection</label>
+      <label><input type="checkbox" id="burp"> Include Burp Suite Logs</label>
+    </div>
+
+    <div class="actions">
+      <button onclick="runScan()">Start Scan</button>
+      <button onclick="downloadReport()">Download Report</button>
+      <button onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <div class="progress">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+
+    <div id="console"></div>
+  </div>
+
+  <script>
+    let theme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+
+    function toggleTheme() {
+      theme = theme === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+    }
+
+    function logToConsole(message) {
+      const consoleEl = document.getElementById('console');
+      consoleEl.innerHTML += `> ${message}<br>`;
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function setProgress(percent) {
+      document.getElementById('progress-bar').style.width = percent + '%';
+    }
+
+    async function runScan() {
+      const url = document.getElementById('url').value;
+      const options = {
+        sql: document.getElementById('sql').checked,
+        xss: document.getElementById('xss').checked,
+        ports: document.getElementById('ports').checked,
+        tech: document.getElementById('tech').checked,
+        burp: document.getElementById('burp').checked,
+      };
+
+      logToConsole('Starting scan for ' + url);
+      setProgress(10);
+
+      for (const key in options) {
+        if (options[key]) logToConsole('Enabled: ' + key.toUpperCase());
+      }
+
+      try {
+        const response = await fetch('http://localhost:5500/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, options })
+        });
+
+        setProgress(60);
+
+        const result = await response.json();
+        if (result.output) {
+          logToConsole('Scan complete.');
+          logToConsole(result.output);
+        } else {
+          logToConsole('Error:');
+          logToConsole(result.error);
+        }
+
+        setProgress(100);
+      } catch (err) {
+        logToConsole('Request failed: ' + err.message);
+        setProgress(100);
+      }
+    }
+
+    function downloadReport() {
+      window.open('vulnerability_scan_report.html', '_blank');
+    }
+
+    function clearConsole() {
+      const consoleEl = document.getElementById('console');
+      consoleEl.innerHTML = ''; 
+      logToConsole('Console cleared.'); 
+    }
+  </script>
+</body>
+</html>
